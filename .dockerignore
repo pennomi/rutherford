@@ -1,0 +1,10 @@
+.git/
+ui/node_modules/
+ui/build/
+ui/.svelte-kit/
+chart/
+README.md
+LICENSE
+*.exe
+*.test
+*.out

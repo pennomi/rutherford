@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+.bg-grid {
+  --grid-size: 20px;
+  --grid-minor: rgba(255, 255, 255, 0.03);
+  --major: calc(var(--grid-size) * 12);
+  background-image:
+    linear-gradient(to right,  var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(to right,  var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-minor) 1px, transparent 1px);
+  background-size:
+    var(--major) var(--major),
+    var(--major) var(--major),
+    var(--grid-size) var(--grid-size),
+    var(--grid-size) var(--grid-size);
+}
+
+.status-icon {
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+@keyframes error-flash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.8); }
+}
+
+.error-flash {
+  animation: error-flash 2s ease-in-out infinite;
+}
+
+dialog[open] {
+  margin: auto;
+  position: fixed;
+  inset: 0;
+}
