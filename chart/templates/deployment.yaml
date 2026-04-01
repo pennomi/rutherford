@@ -14,37 +14,32 @@ spec:
       labels:
         {{- include "rutherford.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "rutherford.serviceAccountName" . }}
+      serviceAccountName: {{ include "rutherford.fullname" . }}
       containers:
         - name: rutherford
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "ghcr.io/pennomi/rutherford:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
               protocol: TCP
           env:
             - name: AUTH_PROVIDER
-              value: {{ .Values.auth.provider | quote }}
+              value: "oidc"
             - name: OIDC_ISSUER
               value: {{ .Values.auth.oidc.issuer | quote }}
             - name: OIDC_CLIENT_ID
               value: {{ .Values.auth.oidc.clientId | quote }}
-            {{- if .Values.auth.oidc.audience }}
             - name: OIDC_AUDIENCE
               value: {{ .Values.auth.oidc.audience | quote }}
-            {{- end }}
-            {{- if .Values.auth.oidc.scopes }}
             - name: OIDC_SCOPES
-              value: {{ .Values.auth.oidc.scopes | quote }}
-            {{- end }}
-            {{- if .Values.storage.hostPath.enabled }}
-            - name: STORAGE_HOST_PATH
-              value: /mnt/storage
-            - name: STORAGE_PATH_PATTERN
-              value: {{ .Values.storage.hostPath.pattern | quote }}
-            {{- end }}
+              value: "openid profile email"
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           livenessProbe:
             httpGet:
               path: /api/auth/config
@@ -57,16 +52,3 @@ spec:
               port: 8080
             initialDelaySeconds: 3
             periodSeconds: 10
-          {{- if .Values.storage.hostPath.enabled }}
-          volumeMounts:
-            - name: storage
-              mountPath: /mnt/storage
-              readOnly: true
-          {{- end }}
-      {{- if .Values.storage.hostPath.enabled }}
-      volumes:
-        - name: storage
-          hostPath:
-            path: {{ .Values.storage.hostPath.path }}
-            type: Directory
-      {{- end }}

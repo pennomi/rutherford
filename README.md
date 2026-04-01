@@ -23,19 +23,10 @@ Real-time Kubernetes monitoring dashboard. Streams cluster state over WebSocket 
 ### Install with Helm
 
 ```bash
-helm install rutherford ./chart \
-  --set auth.oidc.issuer=https://accounts.google.com \
-  --set auth.oidc.clientId=YOUR_CLIENT_ID
-```
-
-### With Ingress
-
-```bash
-helm install rutherford ./chart \
-  --set auth.oidc.issuer=https://accounts.google.com \
-  --set auth.oidc.clientId=YOUR_CLIENT_ID \
-  --set ingress.enabled=true \
-  --set ingress.hosts[0]=rutherford.example.com
+helm install rutherford oci://ghcr.io/pennomi/rutherford --version 0.1.0 \
+  --set auth.oidc.issuer=YOUR_OIDC_ISSUER_URL \
+  --set auth.oidc.clientId=YOUR_OIDC_CLIENT_ID \
+  --set auth.oidc.audience=YOUR_OIDC_AUDIENCE
 ```
 
 ## Configuration
@@ -45,20 +36,10 @@ helm install rutherford ./chart \
 | Value | Description |
 |-------|-------------|
 | `auth.provider` | Auth provider type (only `oidc` currently) |
-| `auth.oidc.issuer` | OIDC issuer URL (e.g., `https://accounts.google.com`) |
+| `auth.oidc.issuer` | OIDC issuer URL |
 | `auth.oidc.clientId` | OIDC client ID |
-| `auth.oidc.audience` | JWT audience claim (defaults to clientId) |
+| `auth.oidc.audience` | JWT audience claim |
 | `auth.oidc.scopes` | OIDC scopes (default: `openid profile email`) |
-
-### Storage scanning (optional)
-
-For clusters using local-path-provisioner or similar host-based storage:
-
-| Value | Description |
-|-------|-------------|
-| `storage.hostPath.enabled` | Enable host path scanning (default: false) |
-| `storage.hostPath.path` | Host path to scan |
-| `storage.hostPath.pattern` | Regex to extract PVC info from directory names |
 
 ### Namespace icons
 

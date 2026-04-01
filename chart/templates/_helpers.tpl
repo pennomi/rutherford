@@ -22,11 +22,3 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | 
 app.kubernetes.io/name: {{ include "rutherford.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
-
-{{- define "rutherford.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- .Values.serviceAccount.name | default (include "rutherford.fullname" .) }}
-{{- else }}
-{{- .Values.serviceAccount.name | default "default" }}
-{{- end }}
-{{- end }}

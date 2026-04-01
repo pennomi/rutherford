@@ -76,8 +76,6 @@ func main() {
 		panic("failed to create metadata client: " + err.Error())
 	}
 
-	InitStorage()
-
 	hub := NewHub()
 	watcher := NewWatcher(clientset, metricsClient, metadataClient, hub)
 	watcher.Start(ctx)
@@ -91,8 +89,6 @@ func main() {
 
 	mux.HandleFunc("GET /ws", HandleWebSocket(auth, hub, watcher))
 	mux.HandleFunc("GET /ws/logs", HandleLogStream(auth, clientset))
-	mux.HandleFunc("GET /api/storage-usage", HandleStorageUsage(auth))
-
 	uiRoot, err := fs.Sub(uiFiles, "ui/build")
 	if err != nil {
 		panic("failed to access embedded UI files: " + err.Error())
@@ -102,8 +98,7 @@ func main() {
 	panic(http.ListenAndServe(":8080", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if path == "/api/auth/config" ||
-			path == "/ws" || path == "/ws/logs" ||
-			(len(path) >= 5 && path[:5] == "/api/") {
+			path == "/ws" || path == "/ws/logs" {
 			mux.ServeHTTP(w, r)
 			return
 		}

@@ -194,39 +194,10 @@
     dialogError = '';
     dialogLoading = true;
     openDialog('Disk Breakdown', [], totalDiskCap, formatDisk(totalDiskCap));
-    fetchStorageUsage();
+    dialogLoading = false;
   }
 
   function noop() {}
-
-  async function fetchStorageUsage() {
-    const user = await getUserManager().getUser();
-    if (!user) {
-      dialogError = 'Not authenticated';
-      dialogLoading = false;
-      return;
-    }
-
-    const resp = await fetch('/api/storage-usage', {
-      headers: { Authorization: `Bearer ${user.access_token}` }
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      dialogError = `${resp.status}: ${text}`;
-      dialogLoading = false;
-      return;
-    }
-    const storageUsage: { name: string; namespace: string; usedBytes: number }[] = await resp.json();
-
-    const segments = storageUsage.map(entry => ({
-      label: `${entry.namespace}/${entry.name}`,
-      value: entry.usedBytes,
-      formatted: formatDisk(entry.usedBytes)
-    })).filter(s => s.value > 0);
-
-    dialogLoading = false;
-    openDialog('Disk Breakdown', segments, totalDiskCap, formatDisk(totalDiskCap));
-  }
 
 
 </script>
