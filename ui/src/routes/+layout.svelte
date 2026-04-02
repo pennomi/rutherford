@@ -14,6 +14,8 @@
   let userEmail = $state('');
   let userPicture = $state('');
   let isCallback = $derived(page.url.pathname === '/callback');
+  let menuOpen = $state(false);
+  let menuRef = $state<HTMLElement>(null!);
 
   interface Crumb {
     label: string;
@@ -70,7 +72,21 @@
   async function logout() {
     await getUserManager().signoutRedirect();
   }
+
+  function handleClickOutside(event: MouseEvent) {
+    if (menuRef && !menuRef.contains(event.target as Node)) {
+      menuOpen = false;
+    }
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      menuOpen = false;
+    }
+  }
 </script>
+
+<svelte:document onclick={handleClickOutside} onkeydown={handleKeydown} />
 
 {#if isCallback}
   {@render children()}
@@ -104,11 +120,38 @@
           {/if}
         </div>
         {#if userEmail}
-          <div class="flex items-center gap-2">
-            {#if userPicture}
-              <img src={userPicture} alt="" class="w-7 h-7 rounded-full" />
+          <div class="relative" bind:this={menuRef}>
+            <button
+              onclick={() => menuOpen = !menuOpen}
+              class="flex items-center gap-2 text-zinc-400 text-sm hover:text-zinc-200 cursor-pointer rounded px-2 py-1 hover:bg-neutral-600 transition-colors"
+            >
+              {#if userPicture}
+                <img src={userPicture} alt="" class="w-7 h-7 rounded-full" />
+              {/if}
+              <span>{userEmail}</span>
+              <svg class="w-3.5 h-3.5 transition-transform {menuOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {#if menuOpen}
+              <div class="absolute right-0 mt-1 w-56 bg-neutral-700 border border-zinc-600 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div class="px-4 py-3 border-b border-zinc-600">
+                  {#if userName}
+                    <p class="text-zinc-200 text-sm font-medium">{userName}</p>
+                  {/if}
+                  <p class="text-zinc-400 text-xs truncate">{userEmail}</p>
+                </div>
+                <button
+                  onclick={logout}
+                  class="w-full text-left px-4 py-2.5 text-sm text-zinc-300 hover:bg-neutral-600 hover:text-white cursor-pointer flex items-center gap-2 transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign out
+                </button>
+              </div>
             {/if}
-            <button onclick={logout} class="text-zinc-400 text-sm hover:text-zinc-200 cursor-pointer">{userEmail}</button>
           </div>
         {/if}
       </div>
