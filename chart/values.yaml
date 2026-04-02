@@ -6,10 +6,10 @@ auth:
     issuer: ""
     clientId: ""
     audience: ""
+    allowedEmails: []
+    allowedGroups: []
 
 ingress:
-  enabled: false
-  className: ""
   annotations: {}
   hosts: []
   tls: []

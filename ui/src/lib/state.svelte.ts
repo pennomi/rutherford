@@ -32,6 +32,7 @@ class ClusterState {
   metricsHistory: MetricsSnapshot[] = $state([]);
   connected = $state(false);
   reconnectStatus = $state('');
+  authError = $state('');
 
   purge() {
     this.namespaces = {};

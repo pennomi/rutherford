@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
@@ -87,6 +88,20 @@ func main() {
 		w.Write(auth.AuthConfigJSON())
 	})
 
+	mux.HandleFunc("GET /api/auth/check", func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if token == "" {
+			http.Error(w, "missing bearer token", http.StatusUnauthorized)
+			return
+		}
+		err := auth.ValidateToken(token)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 	mux.HandleFunc("GET /ws", HandleWebSocket(auth, hub, watcher))
 	mux.HandleFunc("GET /ws/logs", HandleLogStream(auth, clientset))
 	uiRoot, err := fs.Sub(uiFiles, "ui/build")
@@ -97,7 +112,7 @@ func main() {
 
 	panic(http.ListenAndServe(":8080", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if path == "/api/auth/config" ||
+		if path == "/api/auth/config" || path == "/api/auth/check" ||
 			path == "/ws" || path == "/ws/logs" {
 			mux.ServeHTTP(w, r)
 			return

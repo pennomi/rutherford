@@ -6,3 +6,4 @@ ui/.svelte-kit/
 *.exe
 *.test
 *.out
+*.tgz

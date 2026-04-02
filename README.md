@@ -26,20 +26,25 @@ Real-time Kubernetes monitoring dashboard. Streams cluster state over WebSocket 
 helm install rutherford oci://ghcr.io/pennomi/rutherford --version 0.1.0 \
   --set auth.oidc.issuer=YOUR_OIDC_ISSUER_URL \
   --set auth.oidc.clientId=YOUR_OIDC_CLIENT_ID \
-  --set auth.oidc.audience=YOUR_OIDC_AUDIENCE
+  --set auth.oidc.audience=YOUR_OIDC_AUDIENCE \
+  --set "auth.oidc.allowedEmails={alice@company.com,bob@company.com}" \
+  --set "auth.oidc.allowedGroups={k8s-admins}" \
+  --set "ingress.hosts={YOUR_HOSTNAME_1,YOUR_HOSTNAME_2}"
 ```
 
 ## Configuration
 
-### Auth (required)
-
-| Value | Description |
-|-------|-------------|
-| `auth.provider` | Auth provider type (only `oidc` currently) |
-| `auth.oidc.issuer` | OIDC issuer URL |
-| `auth.oidc.clientId` | OIDC client ID |
-| `auth.oidc.audience` | JWT audience claim |
-| `auth.oidc.scopes` | OIDC scopes (default: `openid profile email`) |
+| Value                  | Description                        |
+| ---------------------- | ---------------------------------- |
+| `auth.oidc.issuer`    | OIDC issuer URL                    |
+| `auth.oidc.clientId`  | OIDC client ID                     |
+| `auth.oidc.audience`  | JWT audience claim                 |
+| `auth.oidc.allowedEmails` | Whitelisted email addresses    |
+| `auth.oidc.allowedGroups` | Whitelisted group names        |
+| `ingress.hosts`       | List of hostnames                  |
+| `ingress.tls`         | TLS configuration                  |
+| `ingress.annotations` | Ingress annotations                |
+| `image.tag`           | Image tag (default: `latest`)      |
 
 ### Namespace icons
 

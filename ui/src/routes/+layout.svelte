@@ -8,6 +8,8 @@
 
   let { children } = $props();
   let authRequired = $state(false);
+  let accessDenied = $state(false);
+  let accessDeniedReason = $state('');
   let userName = $state('');
   let userEmail = $state('');
   let userPicture = $state('');
@@ -48,6 +50,16 @@
       userName = user.profile.name ?? user.profile.preferred_username ?? '';
       userEmail = user.profile.email ?? '';
       userPicture = user.profile.picture ?? '';
+
+      const checkResp = await fetch('/api/auth/check', {
+        headers: { Authorization: `Bearer ${user.access_token}` }
+      });
+      if (!checkResp.ok) {
+        accessDenied = true;
+        accessDeniedReason = await checkResp.text();
+        return;
+      }
+
       connectWebSocket(user.access_token);
     } else {
       authRequired = true;
@@ -106,7 +118,17 @@
     {/key}
   </div>
 
-  {#if authRequired}
+  {#if accessDenied || cluster.authError}
+    <div class="fixed inset-0 bg-neutral-900 flex items-center justify-center z-50">
+      <div class="text-center">
+        <h1 class="text-2xl text-white font-semibold mb-2">Access Denied</h1>
+        <p class="text-zinc-400 mb-1">Signed in as <span class="text-zinc-200">{userEmail}</span></p>
+        <p class="text-red-400 text-sm mb-4">{accessDeniedReason || cluster.authError}</p>
+        <p class="text-zinc-500 mb-6">Contact your cluster administrator to request access.</p>
+        <button onclick={logout} class="px-4 py-2 bg-zinc-700 text-zinc-200 rounded hover:bg-zinc-600 cursor-pointer">Sign out</button>
+      </div>
+    </div>
+  {:else if authRequired}
     <div class="fixed inset-0 bg-neutral-900/80 flex items-center justify-center z-50">
       <div class="text-zinc-500">Redirecting to login...</div>
     </div>

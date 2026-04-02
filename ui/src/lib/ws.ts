@@ -25,8 +25,12 @@ export function connectWebSocket(token: string = '') {
       cluster.handleEvent(event);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       cluster.connected = false;
+      if (e.code === 1008) {
+        cluster.authError = e.reason;
+        return;
+      }
       scheduleReconnect();
     };
   }

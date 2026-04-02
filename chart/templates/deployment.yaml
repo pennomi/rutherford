@@ -18,7 +18,7 @@ spec:
       containers:
         - name: rutherford
           image: "ghcr.io/pennomi/rutherford:{{ .Values.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               protocol: TCP
@@ -31,6 +31,10 @@ spec:
               value: {{ .Values.auth.oidc.clientId | quote }}
             - name: OIDC_AUDIENCE
               value: {{ .Values.auth.oidc.audience | quote }}
+            - name: OIDC_ALLOWED_EMAILS
+              value: {{ .Values.auth.oidc.allowedEmails | join "," | quote }}
+            - name: OIDC_ALLOWED_GROUPS
+              value: {{ .Values.auth.oidc.allowedGroups | join "," | quote }}
             - name: OIDC_SCOPES
               value: "openid profile email"
           resources:

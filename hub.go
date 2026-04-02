@@ -69,7 +69,7 @@ func HandleWebSocket(auth Authenticator, hub *Hub, watcher *Watcher) http.Handle
 		}
 		err = auth.ValidateToken(string(tokenBytes))
 		if err != nil {
-			conn.Close(websocket.StatusPolicyViolation, "invalid auth token")
+			conn.Close(websocket.StatusPolicyViolation, err.Error())
 			return
 		}
 
