@@ -4,6 +4,7 @@
   import { cluster } from '$lib/state.svelte';
   import { connectWebSocket } from '$lib/ws';
   import { onMount } from 'svelte';
+  import Breadcrumb from '$lib/Breadcrumb.svelte';
   import '../app.css';
 
   let { children } = $props();
@@ -16,26 +17,6 @@
   let isCallback = $derived(page.url.pathname === '/callback');
   let menuOpen = $state(false);
   let menuRef = $state<HTMLElement>(null!);
-
-  interface Crumb {
-    label: string;
-    href: string;
-  }
-
-  let breadcrumbs = $derived.by((): Crumb[] => {
-    const path = page.url.pathname;
-    const crumbs: Crumb[] = [{ label: 'Rutherford', href: '/' }];
-    const match = path.match(/^\/namespace\/([^/]+)/);
-    if (match) {
-      const ns = decodeURIComponent(match[1]);
-      crumbs.push({ label: ns, href: `/namespace/${match[1]}` });
-      const podMatch = path.match(/^\/namespace\/[^/]+\/pod\/([^/]+)/);
-      if (podMatch) {
-        crumbs.push({ label: decodeURIComponent(podMatch[1]), href: path });
-      }
-    }
-    return crumbs;
-  });
 
   onMount(async () => {
     if (isCallback) return;
@@ -94,20 +75,9 @@
   <div class="bg-neutral-800 min-h-screen">
     <header class="flex items-center justify-between px-6 py-3 bg-neutral-700 border-b border-zinc-700">
       <div class="flex items-center gap-4">
-        <span class="text-white font-semibold text-lg">Rutherford</span>
+        <img src="/favicon.svg" alt="Rutherford" class="w-8 h-8" />
         <span class="w-px h-5 bg-zinc-500"></span>
-        <nav class="flex items-center gap-1.5 text-md">
-          {#each breadcrumbs as crumb, i}
-            {#if i > 0}
-              <span class="text-zinc-600">/</span>
-            {/if}
-            {#if i < breadcrumbs.length - 1}
-              <a href={crumb.href} class="text-zinc-400 hover:text-zinc-200">{crumb.label}</a>
-            {:else}
-              <span class="text-zinc-300">{crumb.label}</span>
-            {/if}
-          {/each}
-        </nav>
+        <Breadcrumb />
       </div>
       <div class="flex items-center gap-5">
         <div class="flex items-center gap-2">
