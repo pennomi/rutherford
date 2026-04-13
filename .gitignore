@@ -7,3 +7,4 @@ ui/.svelte-kit/
 *.test
 *.out
 *.tgz
+scripts/dev.sh

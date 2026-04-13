@@ -2,63 +2,20 @@
   import { page } from '$app/state';
   import { cluster } from '$lib/state.svelte';
   import { formatAge } from '$lib/format';
-  import { podStatus, podAction, failedStates } from '$lib/pod';
-  import type { Pod } from '$lib/types';
-
-  function statusBorderColor(status: string): string {
-    if (status === 'Running') return 'border-l-emerald-500';
-    if (failedStates.has(status)) return 'border-l-red-500';
-    return 'border-l-amber-500';
-  }
-
-  function statusBadgeColor(status: string): string {
-    if (failedStates.has(status)) return 'bg-red-950 text-red-400';
-    return 'bg-amber-950 text-amber-400';
-  }
-
-  interface PodInfo {
-    key: string;
-    name: string;
-    status: string;
-    action: string;
-    ready: number;
-    total: number;
-    restarts: number;
-    age: string;
-  }
+  import PodTile from '$lib/PodTile.svelte';
 
   let nsName = $derived(page.params.name);
 
-  let pods = $derived.by((): PodInfo[] => {
-    const result: PodInfo[] = [];
-
-    for (const [key, pod] of Object.entries(cluster.pods)) {
-      if (pod.metadata.namespace !== nsName) continue;
-      if (pod.status?.phase === 'Succeeded' || pod.status?.phase === 'Failed') continue;
-
-      const status = podStatus(pod);
-      const statuses = pod.status?.containerStatuses ?? [];
-      let readyCount = 0;
-      let totalRestarts = 0;
-      for (const cs of statuses) {
-        if (cs.ready) readyCount++;
-        totalRestarts += cs.restartCount;
-      }
-
-      result.push({
-        key,
-        name: pod.metadata.name,
-        status,
-        action: podAction(pod),
-        ready: readyCount,
-        total: pod.spec?.containers?.length ?? 0,
-        restarts: totalRestarts,
-        age: formatAge(pod.metadata.creationTimestamp),
-      });
-    }
-
-    return result.sort((a, b) => a.name.localeCompare(b.name));
-  });
+  let pods = $derived(
+    Object.entries(cluster.pods)
+      .filter(([, pod]) =>
+        pod.metadata.namespace === nsName
+        && pod.status?.phase !== 'Succeeded'
+        && pod.status?.phase !== 'Failed'
+      )
+      .map(([key, pod]) => ({ key, pod }))
+      .sort((a, b) => a.pod.metadata.name.localeCompare(b.pod.metadata.name))
+  );
 
   function byNs<T extends { metadata: { namespace: string; name: string } }>(records: Record<string, T>): T[] {
     return Object.values(records)
@@ -92,23 +49,9 @@ let nsStatefulSets = $derived(byNs(cluster.statefulSets));
   {#if pods.length === 0}
     <div class="text-sm text-zinc-500 italic mb-8">No running pods in this namespace.</div>
   {:else}
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-8">
-      {#each pods as pod (pod.key)}
-        <a href="/namespace/{nsName}/pod/{pod.name}" class="bg-neutral-700 rounded-lg p-4 border-l-4 {statusBorderColor(pod.status)} block hover:bg-neutral-600 transition-colors">
-          <div class="flex items-center gap-3 mb-3">
-            <span class="font-mono text-sm text-zinc-100 break-all">{pod.name}</span>
-            {#if pod.status !== 'Running'}
-              <span class="shrink-0 ml-auto text-xs px-2 py-0.5 rounded {statusBadgeColor(pod.status)}">{pod.action || pod.status}</span>
-            {/if}
-          </div>
-          <div class="flex gap-4 text-sm text-zinc-500">
-            <span>{pod.ready}/{pod.total} ready</span>
-            <span>{pod.age}</span>
-            {#if pod.restarts > 0}
-              <span>{pod.restarts} restarts</span>
-            {/if}
-          </div>
-        </a>
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4 mb-8">
+      {#each pods as p (p.key)}
+        <PodTile pod={p.pod} />
       {/each}
     </div>
   {/if}

@@ -37,6 +37,7 @@ func spaFileServer(root fs.FS) http.Handler {
 func main() {
 	kubeconfig := flag.String("kubeconfig", "", "path to kubeconfig file (uses in-cluster config if not set)")
 	noAuth := flag.Bool("no-auth", false, "disable authentication (requires --kubeconfig)")
+	port := flag.String("port", "8080", "HTTP listen port")
 	flag.Parse()
 
 	if *noAuth && *kubeconfig == "" {
@@ -110,7 +111,7 @@ func main() {
 	}
 	spaHandler := spaFileServer(uiRoot)
 
-	panic(http.ListenAndServe(":8080", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	panic(http.ListenAndServe(":"+*port, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if path == "/api/auth/config" || path == "/api/auth/check" ||
 			path == "/ws" || path == "/ws/logs" {

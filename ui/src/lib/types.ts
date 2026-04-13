@@ -4,6 +4,7 @@ export interface KubeMeta {
   labels: Record<string, string>;
   annotations: Record<string, string>;
   creationTimestamp: string;
+  deletionTimestamp: string;
 }
 
 export interface ContainerStatus {
@@ -201,14 +202,33 @@ export interface Service {
     type: string;
     clusterIP: string;
     ports: { port: number; targetPort: number; protocol: string; name: string }[];
+    selector: Record<string, string>;
   };
+}
+
+export interface IngressBackend {
+  service: {
+    name: string;
+    port: { number: number; name: string };
+  };
+}
+
+export interface IngressPath {
+  path: string;
+  pathType: string;
+  backend: IngressBackend;
+}
+
+export interface IngressRule {
+  host: string;
+  http: { paths: IngressPath[] };
 }
 
 export interface Ingress {
   kind: 'Ingress';
   metadata: KubeMeta;
   spec: {
-    rules: { host: string }[];
+    rules: IngressRule[];
     tls: { hosts: string[]; secretName: string }[];
   };
 }

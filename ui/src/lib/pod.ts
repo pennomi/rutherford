@@ -33,6 +33,8 @@ export function containerAction(containerName: string, pod: Pod): string {
 }
 
 export function podAction(pod: Pod): string {
+  if (pod.metadata.deletionTimestamp) return 'Terminating';
+
   const initStatuses = pod.status?.initContainerStatuses ?? [];
   const statuses = pod.status?.containerStatuses ?? [];
 
@@ -54,6 +56,8 @@ export function podAction(pod: Pod): string {
 }
 
 export function podStatus(pod: Pod): string {
+  if (pod.metadata.deletionTimestamp) return 'Terminating';
+
   const initStatuses = pod.status?.initContainerStatuses ?? [];
   const statuses = pod.status?.containerStatuses ?? [];
 
