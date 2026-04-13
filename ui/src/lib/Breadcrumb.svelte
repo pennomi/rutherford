@@ -15,7 +15,7 @@
 
   let breadcrumbs = $derived.by((): Crumb[] => {
     const path = page.url.pathname;
-    const crumbs: Crumb[] = [{ label: 'Cluster', resourceType: 'Cluster', href: '/' }];
+    const crumbs: Crumb[] = [{ label: 'Kubernetes', resourceType: 'Cluster', href: '/' }];
 
     const nsMatch = path.match(/^\/namespace\/([^/]+)/);
     if (nsMatch) {
