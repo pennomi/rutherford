@@ -26,6 +26,7 @@ type OIDCAuth struct {
 	issuer        string
 	audience      string
 	clientID      string
+	clientSecret  string
 	scopes        string
 	userinfoURL   string
 	allowedEmails map[string]bool
@@ -33,16 +34,18 @@ type OIDCAuth struct {
 }
 
 type AuthConfig struct {
-	Provider string `json:"provider"`
-	Issuer   string `json:"issuer"`
-	ClientID string `json:"clientId"`
-	Scopes   string `json:"scopes"`
+	Provider     string `json:"provider"`
+	Issuer       string `json:"issuer"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	Scopes       string `json:"scopes"`
 }
 
 type oidcFileConfig struct {
-	issuer   string
-	clientID string
-	scopes   string
+	issuer       string
+	clientID     string
+	clientSecret string
+	scopes       string
 }
 
 const googleIssuer = "https://accounts.google.com"
@@ -93,7 +96,8 @@ func loadAuthFile(path string) oidcFileConfig {
 
 func parseGoogleClient(path, key string, wrapper json.RawMessage) oidcFileConfig {
 	var client struct {
-		ClientID string `json:"client_id"`
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
 	}
 	err := json.Unmarshal(wrapper, &client)
 	if err != nil {
@@ -102,10 +106,14 @@ func parseGoogleClient(path, key string, wrapper json.RawMessage) oidcFileConfig
 	if client.ClientID == "" {
 		panic("Google auth config " + path + " is missing \"" + key + ".client_id\"")
 	}
+	if client.ClientSecret == "" {
+		panic("Google auth config " + path + " is missing \"" + key + ".client_secret\"")
+	}
 	return oidcFileConfig{
-		issuer:   googleIssuer,
-		clientID: client.ClientID,
-		scopes:   "openid profile email",
+		issuer:       googleIssuer,
+		clientID:     client.ClientID,
+		clientSecret: client.ClientSecret,
+		scopes:       "openid profile email",
 	}
 }
 
@@ -128,10 +136,11 @@ func NewOIDCAuth(ctx context.Context, authConfigPath string) *OIDCAuth {
 	}
 
 	cfg := AuthConfig{
-		Provider: "oidc",
-		Issuer:   file.issuer,
-		ClientID: file.clientID,
-		Scopes:   file.scopes,
+		Provider:     "oidc",
+		Issuer:       file.issuer,
+		ClientID:     file.clientID,
+		ClientSecret: file.clientSecret,
+		Scopes:       file.scopes,
 	}
 	configJSON, err := json.Marshal(cfg)
 	if err != nil {
@@ -145,6 +154,7 @@ func NewOIDCAuth(ctx context.Context, authConfigPath string) *OIDCAuth {
 		issuer:        file.issuer,
 		audience:      file.clientID,
 		clientID:      file.clientID,
+		clientSecret:  file.clientSecret,
 		scopes:        file.scopes,
 		userinfoURL:   oidcDoc.UserinfoURL,
 		allowedEmails: allowedEmails,

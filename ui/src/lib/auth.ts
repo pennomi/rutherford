@@ -4,6 +4,7 @@ interface AuthConfig {
   provider: string;
   issuer: string;
   clientId: string;
+  clientSecret: string;
   scopes: string;
 }
 
@@ -25,7 +26,7 @@ export async function initAuth(): Promise<UserManager | null> {
     throw new Error(`Unsupported auth provider: ${_config.provider}`);
   }
 
-  _userManager = new UserManager({
+  const settings: ConstructorParameters<typeof UserManager>[0] = {
     authority: _config.issuer,
     client_id: _config.clientId,
     redirect_uri: `${window.location.origin}/callback`,
@@ -34,7 +35,11 @@ export async function initAuth(): Promise<UserManager | null> {
     response_type: 'code',
     loadUserInfo: true,
     userStore: new WebStorageStateStore({ store: window.localStorage })
-  });
+  };
+  if (_config.clientSecret) {
+    settings.client_secret = _config.clientSecret;
+  }
+  _userManager = new UserManager(settings);
 
   return _userManager;
 }
