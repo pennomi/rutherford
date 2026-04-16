@@ -3,8 +3,6 @@ module github.com/pennomi/rutherford
 go 1.25.0
 
 require (
-	github.com/MicahParks/keyfunc/v3 v3.8.0
-	github.com/golang-jwt/jwt/v5 v5.3.1
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
@@ -13,7 +11,6 @@ require (
 )
 
 require (
-	github.com/MicahParks/jwkset v0.11.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect

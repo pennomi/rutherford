@@ -47,7 +47,7 @@ func main() {
 
 	ctx := context.Background()
 
-	auth := NewAuthenticator(ctx, *noAuth, *authConfig)
+	auth := NewAuthenticator(*noAuth, *authConfig)
 	defer auth.Close()
 
 	var config *rest.Config

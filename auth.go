@@ -1,16 +1,12 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/MicahParks/keyfunc/v3"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type Authenticator interface {
@@ -21,10 +17,7 @@ type Authenticator interface {
 }
 
 type OIDCAuth struct {
-	jwks          keyfunc.Keyfunc
-	cancel        context.CancelFunc
 	issuer        string
-	audience      string
 	clientID      string
 	clientSecret  string
 	scopes        string
@@ -117,22 +110,14 @@ func parseGoogleClient(path, key string, wrapper json.RawMessage) oidcFileConfig
 	}
 }
 
-func NewOIDCAuth(ctx context.Context, authConfigPath string) *OIDCAuth {
+func NewOIDCAuth(authConfigPath string) *OIDCAuth {
 	file := loadAuthFile(authConfigPath)
 
 	allowedEmails := parseCommaSeparated(os.Getenv("ALLOWED_EMAILS"))
 
-	jwksCtx, cancel := context.WithCancel(ctx)
-
 	oidcDoc, err := discoverOIDC(strings.TrimRight(file.issuer, "/") + "/.well-known/openid-configuration")
 	if err != nil {
-		cancel()
 		panic("failed to discover OIDC config: " + err.Error())
-	}
-	jwks, err := keyfunc.NewDefaultCtx(jwksCtx, []string{oidcDoc.JWKSURI})
-	if err != nil {
-		cancel()
-		panic("failed to create JWKS keyfunc from " + oidcDoc.JWKSURI + ": " + err.Error())
 	}
 
 	cfg := AuthConfig{
@@ -144,15 +129,11 @@ func NewOIDCAuth(ctx context.Context, authConfigPath string) *OIDCAuth {
 	}
 	configJSON, err := json.Marshal(cfg)
 	if err != nil {
-		cancel()
 		panic("failed to marshal auth config: " + err.Error())
 	}
 
 	return &OIDCAuth{
-		jwks:          jwks,
-		cancel:        cancel,
 		issuer:        file.issuer,
-		audience:      file.clientID,
 		clientID:      file.clientID,
 		clientSecret:  file.clientSecret,
 		scopes:        file.scopes,
@@ -163,25 +144,13 @@ func NewOIDCAuth(ctx context.Context, authConfigPath string) *OIDCAuth {
 }
 
 func (a *OIDCAuth) ValidateToken(tokenString string) error {
-	_, err := jwt.Parse(tokenString, a.jwks.KeyfuncCtx(context.Background()),
-		jwt.WithIssuer(a.issuer),
-		jwt.WithAudience(a.audience),
-		jwt.WithExpirationRequired(),
-	)
+	userinfo, err := a.fetchUserinfo(tokenString)
 	if err != nil {
 		return err
 	}
-
-	if len(a.allowedEmails) > 0 {
-		userinfo, err := a.fetchUserinfo(tokenString)
-		if err != nil {
-			return fmt.Errorf("failed to fetch userinfo: %w", err)
-		}
-		if !a.allowedEmails[userinfo.Email] {
-			return fmt.Errorf("email %q is not allowed", userinfo.Email)
-		}
+	if len(a.allowedEmails) > 0 && !a.allowedEmails[userinfo.Email] {
+		return fmt.Errorf("email %q is not allowed", userinfo.Email)
 	}
-
 	return nil
 }
 
@@ -206,9 +175,7 @@ func (a *OIDCAuth) AuthConfigJSON() []byte {
 	return a.config
 }
 
-func (a *OIDCAuth) Close() {
-	a.cancel()
-}
+func (a *OIDCAuth) Close() {}
 
 type NoAuth struct {
 	config []byte
@@ -231,7 +198,6 @@ func (a *NoAuth) AuthConfigJSON() []byte { return a.config }
 func (a *NoAuth) Close() {}
 
 type oidcDiscovery struct {
-	JWKSURI     string `json:"jwks_uri"`
 	UserinfoURL string `json:"userinfo_endpoint"`
 }
 
@@ -250,8 +216,8 @@ func discoverOIDC(openidConfigURL string) (oidcDiscovery, error) {
 	if err != nil {
 		return oidcDiscovery{}, fmt.Errorf("failed to parse openid-configuration: %w", err)
 	}
-	if doc.JWKSURI == "" {
-		return oidcDiscovery{}, fmt.Errorf("jwks_uri not found in openid-configuration")
+	if doc.UserinfoURL == "" {
+		return oidcDiscovery{}, fmt.Errorf("userinfo_endpoint not found in openid-configuration")
 	}
 	return doc, nil
 }
@@ -275,10 +241,16 @@ func (a *OIDCAuth) fetchUserinfo(accessToken string) (userinfoResponse, error) {
 	if err != nil {
 		return userinfoResponse{}, err
 	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return userinfoResponse{}, fmt.Errorf("userinfo request returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
 	var info userinfoResponse
 	err = json.Unmarshal(body, &info)
 	if err != nil {
 		return userinfoResponse{}, err
+	}
+	if info.Email == "" {
+		return userinfoResponse{}, fmt.Errorf("userinfo response did not include an email claim (ensure the OIDC client requests the \"email\" scope)")
 	}
 	return info, nil
 }
@@ -297,9 +269,9 @@ func parseCommaSeparated(s string) map[string]bool {
 	return m
 }
 
-func NewAuthenticator(ctx context.Context, noAuth bool, authConfigPath string) Authenticator {
+func NewAuthenticator(noAuth bool, authConfigPath string) Authenticator {
 	if noAuth {
 		return NewNoAuth()
 	}
-	return NewOIDCAuth(ctx, authConfigPath)
+	return NewOIDCAuth(authConfigPath)
 }
