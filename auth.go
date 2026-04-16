@@ -29,7 +29,6 @@ type OIDCAuth struct {
 	scopes        string
 	userinfoURL   string
 	allowedEmails map[string]bool
-	allowedGroups map[string]bool
 	config        []byte
 }
 
@@ -40,32 +39,84 @@ type AuthConfig struct {
 	Scopes   string `json:"scopes"`
 }
 
-func NewOIDCAuth(ctx context.Context) *OIDCAuth {
-	issuer := os.Getenv("OIDC_ISSUER")
-	if issuer == "" {
-		panic("OIDC_ISSUER is required")
+type oidcFileConfig struct {
+	issuer   string
+	clientID string
+	scopes   string
+}
+
+const googleIssuer = "https://accounts.google.com"
+
+func loadAuthFile(path string) oidcFileConfig {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		panic("failed to read auth config file " + path + ": " + err.Error())
 	}
 
-	audience := os.Getenv("OIDC_AUDIENCE")
-	clientID := os.Getenv("OIDC_CLIENT_ID")
-	if clientID == "" {
-		panic("OIDC_CLIENT_ID is required")
-	}
-	if audience == "" {
-		audience = clientID
+	var raw map[string]json.RawMessage
+	err = json.Unmarshal(data, &raw)
+	if err != nil {
+		panic("failed to parse auth config file " + path + ": " + err.Error())
 	}
 
-	scopes := os.Getenv("OIDC_SCOPES")
-	if scopes == "" {
-		scopes = "openid profile email"
+	if wrapper, ok := raw["web"]; ok {
+		return parseGoogleClient(path, "web", wrapper)
+	}
+	if wrapper, ok := raw["installed"]; ok {
+		return parseGoogleClient(path, "installed", wrapper)
 	}
 
-	allowedEmails := parseCommaSeparated(os.Getenv("OIDC_ALLOWED_EMAILS"))
-	allowedGroups := parseCommaSeparated(os.Getenv("OIDC_ALLOWED_GROUPS"))
+	var simple struct {
+		Issuer   string `json:"issuer"`
+		ClientID string `json:"clientId"`
+		Scopes   string `json:"scopes"`
+	}
+	err = json.Unmarshal(data, &simple)
+	if err != nil {
+		panic("failed to parse simple PKCE auth config " + path + ": " + err.Error())
+	}
+	if simple.Issuer == "" {
+		panic("auth config " + path + " is missing required field \"issuer\"")
+	}
+	if simple.ClientID == "" {
+		panic("auth config " + path + " is missing required field \"clientId\"")
+	}
+	if simple.Scopes == "" {
+		simple.Scopes = "openid profile email"
+	}
+	return oidcFileConfig{
+		issuer:   simple.Issuer,
+		clientID: simple.ClientID,
+		scopes:   simple.Scopes,
+	}
+}
+
+func parseGoogleClient(path, key string, wrapper json.RawMessage) oidcFileConfig {
+	var client struct {
+		ClientID string `json:"client_id"`
+	}
+	err := json.Unmarshal(wrapper, &client)
+	if err != nil {
+		panic("failed to parse Google \"" + key + "\" block in " + path + ": " + err.Error())
+	}
+	if client.ClientID == "" {
+		panic("Google auth config " + path + " is missing \"" + key + ".client_id\"")
+	}
+	return oidcFileConfig{
+		issuer:   googleIssuer,
+		clientID: client.ClientID,
+		scopes:   "openid profile email",
+	}
+}
+
+func NewOIDCAuth(ctx context.Context, authConfigPath string) *OIDCAuth {
+	file := loadAuthFile(authConfigPath)
+
+	allowedEmails := parseCommaSeparated(os.Getenv("ALLOWED_EMAILS"))
 
 	jwksCtx, cancel := context.WithCancel(ctx)
 
-	oidcDoc, err := discoverOIDC(strings.TrimRight(issuer, "/") + "/.well-known/openid-configuration")
+	oidcDoc, err := discoverOIDC(strings.TrimRight(file.issuer, "/") + "/.well-known/openid-configuration")
 	if err != nil {
 		cancel()
 		panic("failed to discover OIDC config: " + err.Error())
@@ -78,9 +129,9 @@ func NewOIDCAuth(ctx context.Context) *OIDCAuth {
 
 	cfg := AuthConfig{
 		Provider: "oidc",
-		Issuer:   issuer,
-		ClientID: clientID,
-		Scopes:   scopes,
+		Issuer:   file.issuer,
+		ClientID: file.clientID,
+		Scopes:   file.scopes,
 	}
 	configJSON, err := json.Marshal(cfg)
 	if err != nil {
@@ -91,13 +142,12 @@ func NewOIDCAuth(ctx context.Context) *OIDCAuth {
 	return &OIDCAuth{
 		jwks:          jwks,
 		cancel:        cancel,
-		issuer:        issuer,
-		audience:      audience,
-		clientID:      clientID,
-		scopes:        scopes,
+		issuer:        file.issuer,
+		audience:      file.clientID,
+		clientID:      file.clientID,
+		scopes:        file.scopes,
 		userinfoURL:   oidcDoc.UserinfoURL,
 		allowedEmails: allowedEmails,
-		allowedGroups: allowedGroups,
 		config:        configJSON,
 	}
 }
@@ -112,29 +162,13 @@ func (a *OIDCAuth) ValidateToken(tokenString string) error {
 		return err
 	}
 
-	if len(a.allowedEmails) > 0 || len(a.allowedGroups) > 0 {
+	if len(a.allowedEmails) > 0 {
 		userinfo, err := a.fetchUserinfo(tokenString)
 		if err != nil {
 			return fmt.Errorf("failed to fetch userinfo: %w", err)
 		}
-
-		if len(a.allowedEmails) > 0 {
-			if !a.allowedEmails[userinfo.Email] {
-				return fmt.Errorf("email %q is not allowed", userinfo.Email)
-			}
-		}
-
-		if len(a.allowedGroups) > 0 {
-			found := false
-			for _, g := range userinfo.Groups {
-				if a.allowedGroups[g] {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("user is not in any allowed group")
-			}
+		if !a.allowedEmails[userinfo.Email] {
+			return fmt.Errorf("email %q is not allowed", userinfo.Email)
 		}
 	}
 
@@ -171,7 +205,10 @@ type NoAuth struct {
 }
 
 func NewNoAuth() *NoAuth {
-	cfg, _ := json.Marshal(AuthConfig{Provider: "none"})
+	cfg, err := json.Marshal(AuthConfig{Provider: "none"})
+	if err != nil {
+		panic("failed to marshal no-auth config: " + err.Error())
+	}
 	return &NoAuth{config: cfg}
 }
 
@@ -210,8 +247,7 @@ func discoverOIDC(openidConfigURL string) (oidcDiscovery, error) {
 }
 
 type userinfoResponse struct {
-	Email  string   `json:"email"`
-	Groups []string `json:"groups"`
+	Email string `json:"email"`
 }
 
 func (a *OIDCAuth) fetchUserinfo(accessToken string) (userinfoResponse, error) {
@@ -251,36 +287,9 @@ func parseCommaSeparated(s string) map[string]bool {
 	return m
 }
 
-func claimStringSlice(claims jwt.MapClaims, key string) []string {
-	raw, ok := claims[key]
-	if !ok {
-		return nil
-	}
-	slice, ok := raw.([]interface{})
-	if !ok {
-		return nil
-	}
-	var result []string
-	for _, v := range slice {
-		if s, ok := v.(string); ok {
-			result = append(result, s)
-		}
-	}
-	return result
-}
-
-func NewAuthenticator(ctx context.Context, noAuth bool) Authenticator {
+func NewAuthenticator(ctx context.Context, noAuth bool, authConfigPath string) Authenticator {
 	if noAuth {
 		return NewNoAuth()
 	}
-	provider := os.Getenv("AUTH_PROVIDER")
-	if provider == "" {
-		provider = "oidc"
-	}
-	switch provider {
-	case "oidc":
-		return NewOIDCAuth(ctx)
-	default:
-		panic("unsupported AUTH_PROVIDER: " + provider + " (supported: oidc)")
-	}
+	return NewOIDCAuth(ctx, authConfigPath)
 }

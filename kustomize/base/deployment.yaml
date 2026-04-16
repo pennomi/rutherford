@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rutherford
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rutherford
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rutherford
+    spec:
+      serviceAccountName: rutherford
+      containers:
+        - name: rutherford
+          image: ghcr.io/pennomi/rutherford:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ALLOWED_EMAILS
+              valueFrom:
+                secretKeyRef:
+                  name: rutherford-auth
+                  key: allowed_emails
+          volumeMounts:
+            - name: auth-config
+              mountPath: /etc/rutherford
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /api/auth/config
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/auth/config
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: auth-config
+          secret:
+            secretName: rutherford-auth
+            items:
+              - key: auth.json
+                path: auth.json

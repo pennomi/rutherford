@@ -18,33 +18,79 @@ Real-time Kubernetes monitoring dashboard. Streams cluster state over WebSocket 
 ### Prerequisites
 
 - Kubernetes cluster with [metrics-server](https://github.com/kubernetes-sigs/metrics-server) installed
-- An OIDC provider (Google, Keycloak, etc.) with a client ID configured
+- An OIDC provider with a client configured for PKCE (public client, authorization code + PKCE)
 
-### Install with Helm
+### Install with Kustomize
+
+Two overlay examples are provided under `kustomize/examples/`:
+
+- `google/` — OAuth 2.0 Client ID downloaded from Google Cloud Console
+- `oidc/` — generic OIDC provider with a simple `{ issuer, clientId }` JSON
+
+Copy one, fill in your credentials, and apply:
 
 ```bash
-helm install rutherford oci://ghcr.io/pennomi/rutherford --version 0.1.0 \
-  --set auth.oidc.issuer=YOUR_OIDC_ISSUER_URL \
-  --set auth.oidc.clientId=YOUR_OIDC_CLIENT_ID \
-  --set auth.oidc.audience=YOUR_OIDC_AUDIENCE \
-  --set "auth.oidc.allowedEmails={alice@company.com,bob@company.com}" \
-  --set "auth.oidc.allowedGroups={k8s-admins}" \
-  --set "ingress.hosts={YOUR_HOSTNAME_1,YOUR_HOSTNAME_2}"
+cp -r kustomize/examples/oidc my-rutherford
+
+# Drop in your auth config:
+cp my-rutherford/auth.json.example my-rutherford/auth.json
+$EDITOR my-rutherford/auth.json
+
+# Set the allowed email list and hostname:
+$EDITOR my-rutherford/kustomization.yaml
+$EDITOR my-rutherford/ingress.yaml
+
+kubectl apply -k my-rutherford
 ```
 
-## Configuration
+For Google, download the OAuth Client JSON from the GCP console and save it as
+`client_secret.json` in the overlay directory — Rutherford detects the `web`
+wrapper automatically.
 
-| Value                  | Description                        |
-| ---------------------- | ---------------------------------- |
-| `auth.oidc.issuer`    | OIDC issuer URL                    |
-| `auth.oidc.clientId`  | OIDC client ID                     |
-| `auth.oidc.audience`  | JWT audience claim                 |
-| `auth.oidc.allowedEmails` | Whitelisted email addresses    |
-| `auth.oidc.allowedGroups` | Whitelisted group names        |
-| `ingress.hosts`       | List of hostnames                  |
-| `ingress.tls`         | TLS configuration                  |
-| `ingress.annotations` | Ingress annotations                |
-| `image.tag`           | Image tag (default: `latest`)      |
+## Auth Configuration
+
+Rutherford reads a single JSON file (mounted as a Kubernetes secret at
+`/etc/rutherford/auth.json` by default) and auto-detects the format:
+
+**Google** (the unmodified JSON from Google Cloud Console):
+
+```json
+{
+  "web": {
+    "client_id": "...apps.googleusercontent.com",
+    "...": "other fields are ignored"
+  }
+}
+```
+
+**Generic OIDC / PKCE**:
+
+```json
+{
+  "issuer": "https://auth.example.com/realms/my-realm",
+  "clientId": "rutherford",
+  "scopes": "openid profile email"
+}
+```
+
+`scopes` is optional and defaults to `openid profile email`. Any parse or
+discovery error causes Rutherford to panic on startup — there are no
+fallbacks.
+
+### Allow list
+
+Set `ALLOWED_EMAILS` as an environment variable (comma-separated) to restrict
+access. In the provided overlays it is sourced from the same secret as
+`auth.json`:
+
+```yaml
+secretGenerator:
+  - name: rutherford-auth
+    files:
+      - auth.json
+    literals:
+      - allowed_emails=alice@example.com,bob@example.com
+```
 
 ### Namespace icons
 
@@ -65,13 +111,40 @@ Run the Go API and SvelteKit dev server separately:
 
 ```bash
 # Terminal 1: API server (requires in-cluster config or kubeconfig)
-go run .
+go run . --kubeconfig ~/.kube/config --no-auth
 
 # Terminal 2: UI dev server with hot reload
 cd ui && npm run dev
 ```
 
 The Vite dev server proxies `/api/*` and `/ws/*` to the Go server on `:8080`.
+
+### Testing auth locally
+
+`--no-auth` skips the whole auth path. To exercise real OIDC in dev, drop
+`--no-auth` and point `--auth-config` at a local JSON file:
+
+1. Register `http://localhost:5173/callback` as an allowed redirect URI with
+   your OIDC provider (Vite's default dev port). For Google, also add
+   `http://localhost:5173` under "Authorized JavaScript origins".
+2. Save the provider's JSON somewhere git-ignored (e.g.
+   `~/.config/rutherford-dev.json`) — either the raw Google client JSON or the
+   simple `{ "issuer": "...", "clientId": "..." }` form.
+3. Run:
+
+   ```bash
+   # Terminal 1
+   go run . \
+     --kubeconfig ~/.kube/config \
+     --auth-config ~/.config/rutherford-dev.json \
+     --port 8081
+
+   # Terminal 2
+   cd ui && RUTHERFORD_PORT=8081 npm run dev
+   ```
+
+   Set `ALLOWED_EMAILS=you@example.com` on the Go process to also exercise the
+   allow-list.
 
 ## Architecture
 

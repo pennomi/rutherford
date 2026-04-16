@@ -1,0 +1,5 @@
+{
+  "issuer": "https://auth.example.com/realms/my-realm",
+  "clientId": "rutherford",
+  "scopes": "openid profile email"
+}

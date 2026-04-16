@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Example overlay for a generic OIDC provider using PKCE
+# (Keycloak, Dex, Zitadel, Auth0, Okta, etc.).
+#
+# 1. Register a public client with your provider. Add
+#    https://YOUR_HOSTNAME/callback as an allowed redirect URI and
+#    enable the "authorization_code" flow with PKCE.
+# 2. Copy auth.json.example to auth.json and fill in issuer + clientId.
+#    The "scopes" field is optional (defaults to "openid profile email").
+# 3. Replace ALLOWED_EMAILS below with the users you want to permit.
+# 4. Replace YOUR_HOSTNAME in ingress.yaml.
+# 5. kubectl apply -k .
+
+resources:
+  - ../../base
+  - ingress.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - name: rutherford-auth
+    files:
+      - auth.json
+    literals:
+      - allowed_emails=alice@example.com,bob@example.com

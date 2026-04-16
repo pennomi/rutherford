@@ -37,6 +37,7 @@ func spaFileServer(root fs.FS) http.Handler {
 func main() {
 	kubeconfig := flag.String("kubeconfig", "", "path to kubeconfig file (uses in-cluster config if not set)")
 	noAuth := flag.Bool("no-auth", false, "disable authentication (requires --kubeconfig)")
+	authConfig := flag.String("auth-config", "/etc/rutherford/auth.json", "path to OIDC auth config JSON (Google client secret or simple PKCE)")
 	port := flag.String("port", "8080", "HTTP listen port")
 	flag.Parse()
 
@@ -46,7 +47,7 @@ func main() {
 
 	ctx := context.Background()
 
-	auth := NewAuthenticator(ctx, *noAuth)
+	auth := NewAuthenticator(ctx, *noAuth, *authConfig)
 	defer auth.Close()
 
 	var config *rest.Config
